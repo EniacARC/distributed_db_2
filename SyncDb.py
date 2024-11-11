@@ -2,6 +2,7 @@ import threading
 import multiprocessing
 from SynClass import Sync
 from Logger import Logger
+import pywin32
 
 
 class SyncDatabase(Sync):
@@ -16,12 +17,14 @@ class SyncDatabase(Sync):
         # Log initialization details
         if mode:
             Logger.info(f"Initializing SyncDatabase with threading. Concurrent readers allowed: {amount}")
-            semaphore: threading.Semaphore = threading.Semaphore(amount)
-            lock: threading.Lock = threading.Lock()
+            # semaphore: threading.Semaphore = threading.Semaphore(amount)
+            # lock: threading.Lock = threading.Lock()
         else:
             Logger.info(f"Initializing SyncDatabase with multiprocessing. Concurrent readers allowed: {amount}")
-            semaphore: multiprocessing.Semaphore = multiprocessing.Semaphore(amount)
-            lock: multiprocessing.Lock = multiprocessing.Lock()
+            # semaphore: multiprocessing.Semaphore = multiprocessing.Semaphore(amount)
+            # lock: multiprocessing.Lock = multiprocessing.Lock()
+        semaphore = pywin32.CreateSemaphore(None, amount, amount, None)
+        lock = pywin32.CreateMutex(False, None)
 
         super().__init__(filepath, semaphore, lock, amount)
 
