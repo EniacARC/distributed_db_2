@@ -41,11 +41,13 @@ def main():
     updated_value = "updatedValue"
     sync_db.set_value(key, updated_value)
     result = sync_db.get_value(key)
+    print(result)
     assert_equal(result, updated_value, "Test 2: Update Value")
 
     # Test 3: Deleting a value
     sync_db.delete_value(key)
     result = sync_db.get_value(key)
+    print(result)
     assert_equal(result, None, "Test 3: Delete Value")
 
     # Test 4: Invalid key type handling

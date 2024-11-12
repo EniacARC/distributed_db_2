@@ -1,9 +1,17 @@
-import os
 import re
 import pickle
 from typing import Optional
+
+import win32api
+
 from Database import Database
 from Logger import Logger  # Import the Logger class
+import win32event
+import win32file
+import win32con
+import pywintypes
+
+BUF_SIZE = 2048
 
 
 class DataBase(Database):
@@ -19,14 +27,39 @@ class DataBase(Database):
         if re.search(r"\w+\.pickle$", filepath) is None:
             raise Exception("db file is not valid!")
 
-        if not os.path.exists(filepath):
-            # Create the file if it doesn't exist
-            with open(filepath, 'wb') as f:
-                # Optionally write an initial value or leave it empty
-                pickle.dump(self.db, f)
-            Logger.info(f"Database file created at: {filepath}")
-        else:
+        # if not os.path.exists(filepath):
+        #     # Create the file if it doesn't exist
+        #     with open(filepath, 'wb') as f:
+        #         # Optionally write an initial value or leave it empty
+        #         pickle.dump(self.db, f)
+        #     Logger.info(f"Database file created at: {filepath}")
+        # else:
+        #     Logger.info(f"Database initialized from file: {filepath}")
+        try:
+            win32api.GetFileAttributes(filepath)
             Logger.info(f"Database initialized from file: {filepath}")
+        except Exception as exc:
+            han = win32file.CreateFile(filepath, win32con.GENERIC_READ | win32con.GENERIC_WRITE,
+                                       win32con.FILE_SHARE_READ | win32con.FILE_SHARE_WRITE, None,
+                                       win32con.OPEN_ALWAYS, win32con.FILE_ATTRIBUTE_NORMAL, None)
+            win32file.WriteFile(han, pickle.dumps(self.db), None)
+            win32api.CloseHandle(han)
+            Logger.info(f"Database file created at: {filepath}")
+
+    def __read_data(self, file_handle):
+        data = b''
+
+        try:
+            while True:
+                code, buf = win32file.ReadFile(file_handle, BUF_SIZE, None)
+                if not buf:
+                    break
+
+                data += buf
+        except Exception as exc:
+            Logger.error(f"exception has occurred when reading file: {exc}")
+        finally:
+            return data
 
     def __load_dict(self) -> None:
         """
@@ -35,10 +68,17 @@ class DataBase(Database):
         This method will only load the data if it hasn't been loaded already (i.e., `self.change` is `True`).
         """
         if self.change:
-            with open(self.__filepath, "rb") as f:
-                self.db = pickle.load(f)
+            # with open(self.__filepath, "rb") as f:
+            f = win32file.CreateFile(self.__filepath, win32con.GENERIC_READ | win32con.GENERIC_WRITE,
+                                     win32con.FILE_SHARE_READ | win32con.FILE_SHARE_WRITE, None,
+                                     win32con.OPEN_EXISTING, win32con.FILE_ATTRIBUTE_NORMAL, None)
+            data = self.__read_data(f)
+            self.db = pickle.loads(data)
+
             self.change = False
             Logger.info(f"Database loaded from file: {self.__filepath}")
+
+            win32api.CloseHandle(f)
 
     def __write_to_file(self) -> None:
         """
@@ -46,10 +86,18 @@ class DataBase(Database):
 
         This method updates the file with the current state of `self.db`.
         """
-        with open(self.__filepath, "wb") as f:
-            pickle.dump(self.db, f)
-        self.change = True
-        Logger.info(f"Database written to file: {self.__filepath}")
+        f = win32file.CreateFile(self.__filepath, win32con.GENERIC_WRITE | win32con.GENERIC_WRITE,
+                                 win32con.FILE_SHARE_READ | win32con.FILE_SHARE_WRITE, None,
+                                 win32con.OPEN_EXISTING, win32con.FILE_ATTRIBUTE_NORMAL, None)
+        dumped = pickle.dumps(self.db)
+        try:
+            win32file.WriteFile(f, dumped, None)
+        except Exception as exc:
+            Logger.error(f"error while writing {exc}")
+        finally:
+            win32api.CloseHandle(f)
+            self.change = True
+            Logger.info(f"Database written to file: {self.__filepath}")
 
     def get_value(self, key: str) -> Optional[object]:
         """

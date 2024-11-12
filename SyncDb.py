@@ -1,8 +1,11 @@
 import threading
 import multiprocessing
+
+import win32api
+
 from SynClass import Sync
 from Logger import Logger
-import pywin32
+import win32event
 
 
 class SyncDatabase(Sync):
@@ -23,11 +26,16 @@ class SyncDatabase(Sync):
             Logger.info(f"Initializing SyncDatabase with multiprocessing. Concurrent readers allowed: {amount}")
             # semaphore: multiprocessing.Semaphore = multiprocessing.Semaphore(amount)
             # lock: multiprocessing.Lock = multiprocessing.Lock()
-        semaphore = pywin32.CreateSemaphore(None, amount, amount, None)
-        lock = pywin32.CreateMutex(False, None)
+        semaphore = win32event.CreateSemaphore(None, amount, amount, None)
+        lock = win32event.CreateMutex(None, False, None)
 
         super().__init__(filepath, semaphore, lock, amount)
 
         # Log successful initialization
         Logger.info(f"SyncDatabase initialized for {'threading' if mode else 'multiprocessing'} mode.")
+
+    def __del__(self):
+        win32api.CloseHandle(self.semaphore)
+        win32api.CloseHandle(self.lock_write)
+        Logger.info("Closed lock logic handles")
 

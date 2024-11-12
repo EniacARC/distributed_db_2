@@ -3,12 +3,13 @@ import threading
 import multiprocessing
 from DatabaseRead import DataBase
 from Logger import Logger  # Import the Logger class
-import pywin32
+from ctypes.wintypes import HANDLE
+import win32event
 
 
 class Sync:
-    def __init__(self, filepath: str, sem_read: pywin32.Semaphore,
-                 lock_write: pywin32.Mutex, read_amount: int) -> None:
+    def __init__(self, filepath: str, sem_read: HANDLE,
+                 lock_write: HANDLE, read_amount: int) -> None:
         """
         Initializes the Sync class for controlling concurrent read/write operations.
 
@@ -36,12 +37,12 @@ class Sync:
         """
         r_value = None
         try:
-            pywin32.WaitForSingleObject(self.semaphore, 5000)
+            win32event.WaitForSingleObject(self.semaphore, win32event.INFINITE)
             r_value = func(*args)
         except Exception as ex:
             Logger.error(f"Read operation failed for key: {args[0]} - {ex}")
         finally:
-            pywin32.ReleaseSemaphore(self.semaphore, 1)
+            win32event.ReleaseSemaphore(self.semaphore, 1)
         return r_value
 
     def __get_write(self, func, *args) -> bool:
@@ -54,16 +55,16 @@ class Sync:
         """
         r_value = False
         try:
-            pywin32.WaitForSingleObject(self.lock_write, 10000)  # make inf
+            win32event.WaitForSingleObject(self.lock_write, win32event.INFINITE)  # make inf
             for _ in range(self.read_amount):
-                pywin32.WaitForSingleObject(self.semaphore, 5000)
+                win32event.WaitForSingleObject(self.semaphore, win32event.INFINITE)
 
             r_value = func(*args)
         except Exception as ex:
             Logger.error(f"Write operation failed for key: {args[0]} - {ex}")
         finally:
-            pywin32.ReleaseSemaphore(self.semaphore, self.read_amount)
-            pywin32.ReleaseMutex(self.lock_write)
+            win32event.ReleaseSemaphore(self.semaphore, self.read_amount)
+            win32event.ReleaseMutex(self.lock_write)
         return r_value
 
     def get_value(self, key: str) -> object:
