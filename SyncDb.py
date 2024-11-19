@@ -9,6 +9,9 @@ import win32event
 
 
 class SyncDatabase(Sync):
+    SEMAPHORE_NAME = 'SemReadWrite'
+    WRITE_LOCK_NAME = 'WriteLock'
+
     def __init__(self, filepath: str, mode: bool, amount: int) -> None:
         """
         Initialize SyncDatabase with either threading or multiprocessing.
@@ -26,8 +29,8 @@ class SyncDatabase(Sync):
             Logger.info(f"Initializing SyncDatabase with multiprocessing. Concurrent readers allowed: {amount}")
             # semaphore: multiprocessing.Semaphore = multiprocessing.Semaphore(amount)
             # lock: multiprocessing.Lock = multiprocessing.Lock()
-        semaphore = win32event.CreateSemaphore(None, amount, amount, None)
-        lock = win32event.CreateMutex(None, False, None)
+        semaphore = win32event.CreateSemaphore(None, amount, amount, self.SEMAPHORE_NAME)
+        lock = win32event.CreateMutex(None, False, self.WRITE_LOCK_NAME)
 
         super().__init__(filepath, semaphore, lock, amount)
 
@@ -38,4 +41,3 @@ class SyncDatabase(Sync):
         win32api.CloseHandle(self.semaphore)
         win32api.CloseHandle(self.lock_write)
         Logger.info("Closed lock logic handles")
-
